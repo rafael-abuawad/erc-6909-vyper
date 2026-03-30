@@ -60,10 +60,8 @@ def supportsInterface(interfaceId: bytes4) -> bool:
 @view
 def contractURI() -> String[512]:
     """
-    @dev Returns the Uniform Resource Identifier (URI) for
-         contract-level metadata.
-    @return String The maximum 512-character user-readable
-            string contract URI.
+    @dev The URI for the contract.
+    @return String The maximum 512-character contract URI string.
     """
     ...
 
@@ -72,16 +70,10 @@ def contractURI() -> String[512]:
 @view
 def tokenURI(_id: uint256) -> String[512]:
     """
-    @dev Returns the Uniform Resource Identifier (URI)
-         for token `_id`.
-    @notice If the `{id}` substring is present in the URI,
-            it must be replaced by clients with the actual
-            token id. Note that the `tokenURI` function must
-            not be used to check for the existence of a token
-            as it is possible for an implementation to return
-            a valid string even if the token does not exist.
+    @dev The URI for a token `_id`.
+    @notice MAY revert if token `_id` does not exist. Clients MUST replace
+            occurrences of `{id}` in the returned URI with the actual token id.
     @param _id The 32-byte token id.
-    @return String The maximum 512-character user-readable
-            string token URI for token id `_id`.
+    @return String The maximum 512-character token URI for `_id`.
     """
     ...

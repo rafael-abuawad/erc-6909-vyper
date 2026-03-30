@@ -5,152 +5,67 @@
 @custom:contract-name erc6909
 @license GNU Affero General Public License v3.0 only
 @author rafael-abuawad
-@notice These functions implement the ERC-6909
-        standard interface:
-        - https://eips.ethereum.org/EIPS/eip-6909.
-        In addition, the following functions have
-        been added for convenience:
-        - `set_token_uri` (`external` function),
-        - `set_name` (`external` function),
-        - `set_symbol` (`external` function),
-        - `set_decimals` (`external` function),
-        - `exists` (`external` `view` function),
-        - `burn` (`external` function),
-        - `is_minter` (`external` `view` function),
-        - `mint` (`external` function),
-        - `set_minter` (`external` function),
-        - `owner` (`external` `view` function),
-        - `transfer_ownership` (`external` function),
-        - `renounce_ownership` (`external` function),
-        - `_before_token_transfer` (`internal` function),
-        - `_after_token_transfer` (`internal` function).
-        The implementation is inspired by OpenZeppelin's implementation here:
-        https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC1155/ERC1155.sol.
+@notice ERC-6909 multi-token contract with optional metadata, content-URI, and total-supply
+        extensions (https://eips.ethereum.org/EIPS/eip-6909). Adds snekmate `ownable`, a minter
+        role, `create` / `mint` / `burn`, URI helpers, and no-op transfer hooks for extensions.
 """
 
 
-# @dev We import and implement the `IERC165` interface,
-# which is a built-in interface of the Vyper compiler.
+# Built-in ERC-165 plus project interfaces for ERC-6909 and its optional extensions.
 from ethereum.ercs import IERC165
 implements: IERC165
 
 
-# @dev We import and implement the `IERC6909` interface,
-# which is written using standard Vyper syntax.
 from .interfaces import IERC6909
 implements: IERC6909
 
 
-# @dev We import and implement the `IERC6909ContentURI` interface,
-# which is written using standard Vyper syntax.
 from .interfaces import IERC6909ContentURI
 implements: IERC6909ContentURI
 
 
-# @dev We import and implement the `IERC6909Metadata` interface,
-# which is written using standard Vyper syntax.
 from .interfaces import IERC6909Metadata
 implements: IERC6909Metadata
 
 
-# @dev We import and implement the `IERC6909TokenSupply` interface,
-# which is written using standard Vyper syntax.
 from .interfaces import IERC6909TokenSupply
 implements: IERC6909TokenSupply
 
 
-# @dev We import and use the `ownable` module.
 from snekmate.auth import ownable
 uses: ownable
 
 
-# @dev We export (i.e. the runtime bytecode exposes these
-# functions externally, allowing them to be called using
-# the ABI encoding specification) the `external` getter
-# function `owner` from the `ownable` module.
-# @notice Please note that you must always also export (if
-# required by the contract logic) `public` declared `constant`,
-# `immutable`, and state variables, for which Vyper automatically
-# generates an `external` getter function for the variable.
-exports: (
-    # @notice This ERC-6909 implementation includes the `transfer_ownership`
-    # and `renounce_ownership` functions, which incorporate
-    # the additional built-in `is_minter` role logic and are
-    # therefore not exported from the `ownable` module.
-    ownable.owner,
-)
+exports: (ownable.owner,)
 
 
-# @dev Stores the ERC-165 interface identifier for each
-# imported interface. The ERC-165 interface identifier
-# is defined as the XOR of all function selectors in the
-# interface.
-# @notice If you are not using the full feature set of
-# this contract, please ensure you exclude the unused
-# ERC-165 interface identifiers in the main contract.
 _SUPPORTED_INTERFACES: constant(bytes4[5]) = [
-    0x01FFC9A7, # The ERC-165 identifier for ERC-165.
-    0x0f632fb3, # The ERC-165 identifier for ERC-6909.
-    0x20d88258, # The ERC-165 identifier for the ERC-6909 content URI extension.
-    0x71abc795, # The ERC-165 identifier for the ERC-6909 metadata extension.
-    0xbd85b039, # The ERC-165 identifier for the ERC-6909 token supply extension.
+    0x01FFC9A7,  # ERC-165
+    0x0f632fb3,  # ERC-6909 core
+    0x20d88258,  # ERC-6909 content URI extension
+    0x71abc795,  # ERC-6909 metadata extension
+    0xbd85b039,  # ERC-6909 token supply extension
 ]
 
 
-# @dev Stores the base URI for computing `uri`.
 _BASE_URI: immutable(String[80])
+_CONTRACT_URI: immutable(String[512])
 
 
-# @dev Struct for token metadata.
+_balances: HashMap[address, HashMap[uint256, uint256]]
+_allowances: HashMap[address, HashMap[address, HashMap[uint256, uint256]]]
+_operator_approvals: HashMap[address, HashMap[address, bool]]
+_total_supply: HashMap[uint256, uint256]
+_token_metadata: HashMap[uint256, TokenMetadata]
+_token_uris: HashMap[uint256, String[432]]
+_counter: uint256
+_is_minter: HashMap[address, bool]
+
+
 struct TokenMetadata:
     name: String[25]
     symbol: String[5]
     decimals: uint8
-
-
-# @dev Stores per-address balances: amount of token 
-# `id` owned by each address.
-# @notice If you declare a variable as `public`,
-# Vyper automatically generates an `external`
-# getter function for the variable.
-_balances: HashMap[address, HashMap[uint256, uint256]]
-
-
-# @dev Allowance for (`owner`, `spender`) on token `id`
-_allowances: HashMap[address, HashMap[address, HashMap[uint256, uint256]]]
-
-
-# @dev `True` if `operator` is approved to move any amount of
-# any token `id` on behalf of `owner`.
-_operator_approvals: HashMap[address, HashMap[address, bool]]
-
-
-# @dev Total minted supply per token `id` (token supply extension).
-_total_supply: HashMap[uint256, uint256]
-
-
-# @dev Mapping from token `id` to metadata
-_token_metadata: HashMap[uint256, TokenMetadata]
-
-
-# @dev Returns `True` if an `address` has been
-# granted the minter role.
-is_minter: public(HashMap[address, bool])
-
-
-# @dev Mapping from token id to token URI.
-# @notice Since the Vyper design requires
-# strings of fixed size, we arbitrarily set
-# the maximum length for `_token_uris` to 432
-# characters. Since we have set the maximum
-# length for `_BASE_URI` to 80 characters,
-# which implies a maximum character length
-# for `tokenURI` of 512.
-_token_uris: HashMap[uint256, String[432]]
-
-
-# @dev Contract URI
-_CONTRACT_URI: immutable(String[512])
 
 
 # @dev Emitted when the status of a `minter`
@@ -160,122 +75,251 @@ event RoleMinterChanged:
     status: bool
 
 
-# @dev The name of the token of type `id` was updated to `newName`.
-event ERC6909NameUpdated:
+# Emitted when a new token id is created with metadata.
+event ERC6909MetadataSet:
     id: indexed(uint256)
-    newName: String[25]
-
-
-# @dev The symbol for the token of type `id` was updated to `newSymbol`.
-event ERC6909SymbolUpdated:
-    id: indexed(uint256)
-    newSymbol: String[5]
-
-
-# @dev The decimals value for token of type `id` was updated to `newDecimals`.
-event ERC6909DecimalsUpdated:
-    id: indexed(uint256)
-    newDecimals: uint8
+    name: String[25]
+    symbol: String[5]
+    decimals: uint8
 
 
 @deploy
 @payable
 def __init__(base_uri_: String[80], contract_uri_: String[512]):
     """
-    @dev To omit the opcodes for checking the `msg.value`
-         in the creation-time EVM bytecode, the constructor
-         is declared as `payable`.
-    @notice At initialisation time, the `owner` role will be
-            assigned to the `msg.sender` since we `uses` the
-            `ownable` module, which implements the aforementioned
-            logic at contract creation time.
-    @param base_uri_ The maximum 80-character user-readable
-           string base URI for `tokenURI` (may be empty; see `_token_uri`).
-    @param contract_uri_ The maximum 512-character contract-level URI
-           stored in `_CONTRACT_URI` and returned by `contractURI`.
+    @dev `payable` avoids extra `msg.value` checks in the creation bytecode.
+    @notice `ownable` assigns `owner` to `msg.sender`; deployer is also initial minter.
+    @param base_uri_ Optional prefix for `tokenURI` (see `_token_uri`); max 80 chars.
+    @param contract_uri_ Value returned by `contractURI`; max 512 chars.
     """
     _BASE_URI = base_uri_
     _CONTRACT_URI = contract_uri_
-    
-    self.is_minter[msg.sender] = True
+
+    self._counter = empty(uint256)
+    self._is_minter[msg.sender] = True
     log RoleMinterChanged(minter=msg.sender, status=True)
+
+
+@external
+@view
+def supportsInterface(interface_id: bytes4) -> bool:
+    """
+    @dev ERC-165 `supportsInterface`.
+    @param interface_id EIP-165 interface id.
+    @return bool Whether this contract supports `interface_id`.
+    """
+    return interface_id in _SUPPORTED_INTERFACES
+
+
+@external
+@view
+def name(id: uint256) -> String[25]:
+    """
+    @dev Metadata extension: name for `id`.
+    @param id Token id.
+    @return String Name (max 25 chars).
+    """
+    return self._token_metadata[id].name
+
+
+@external
+@view
+def symbol(id: uint256) -> String[5]:
+    """
+    @dev Metadata extension: symbol for `id`.
+    @param id Token id.
+    @return String Symbol (max 5 chars).
+    """
+    return self._token_metadata[id].symbol
+
+
+@external
+@view
+def decimals(id: uint256) -> uint8:
+    """
+    @dev Metadata extension: decimals for `id`.
+    @param id Token id.
+    @return uint8 Decimals.
+    """
+    return self._token_metadata[id].decimals
+
+
+@external
+@view
+def balanceOf(owner: address, id: uint256) -> uint256:
+    """
+    @dev Balance of `id` for `owner` (EIP-6909).
+    @param owner Account holding tokens.
+    @param id Token id.
+    @return uint256 Balance.
+    """
+    return self._balances[owner][id]
+
+
+@external
+@view
+def allowance(owner: address, spender: address, id: uint256) -> uint256:
+    """
+    @dev Allowance of `spender` for `id` on behalf of `owner` (EIP-6909).
+    @param owner Token holder.
+    @param spender Delegated spender.
+    @param id Token id.
+    @return uint256 Allowance amount.
+    """
+    return self._allowances[owner][spender][id]
+
+
+@external
+@view
+def isOperator(owner: address, operator: address) -> bool:
+    """
+    @dev Whether `operator` may move any `id` for `owner` (EIP-6909).
+    @param owner Token holder.
+    @param operator Operator account.
+    @return bool Approved operator status.
+    """
+    return self._operator_approvals[owner][operator]
+
+
+@external
+@view
+def contractURI() -> String[512]:
+    """
+    @dev Content-URI extension: contract-level metadata URI.
+    @return String URI (immutable, max 512 chars).
+    """
+    return _CONTRACT_URI
+
+
+@external
+@view
+def tokenURI(id: uint256) -> String[512]:
+    """
+    @dev Content-URI extension: URI for `id` (base + per-token segment; see `_token_uri`).
+    @notice Clients replace `{id}` in the returned string if present (EIP-6909). MAY revert or
+            return data for nonexistent ids per extension semantics.
+    @param id Token id.
+    @return String Full URI (max 512 chars).
+    """
+    return self._token_uri(id)
+
+
+@external
+@view
+def totalSupply(id: uint256) -> uint256:
+    """
+    @dev Token supply extension: `totalSupply` for `id`.
+    @param id Token id.
+    @return uint256 Supply after mints minus burns.
+    """
+    return self._total_supply[id]
+
+
+@external
+@view
+def exists(id: uint256) -> bool:
+    """
+    @dev Convenience: `True` iff `totalSupply(id) != 0` (this implementation).
+    @param id Token id.
+    @return bool Whether supply has ever been positive.
+    """
+    return self._total_supply[id] != empty(uint256)
+
+
+@external
+@view
+def is_minter(minter: address) -> bool:
+    """
+    @dev Whether `minter` is authorized to mint tokens.
+    @param minter Address to check.
+    @return bool Authorization status.
+    """
+    return self._is_minter[minter]
 
 
 @external
 def transfer(to: address, id: uint256, amount: uint256) -> bool:
     """
-    @dev Transfers `amount` tokens of token `id` from the caller's
-         account to `to`.
-    @notice `to` cannot be the zero address. The caller must have a balance
-            of token `id` of at least `amount`.
-    @param to The 20-byte receiver address.
-    @param id The 32-byte token id.
-    @param amount The 32-byte token amount to be transferred.
+    @dev EIP-6909 `transfer`: caller sends `amount` of `id` to `to`.
+    @notice Reverts on insufficient balance; this implementation forbids zero `to` (`_transfer`).
+    @param to Recipient.
+    @param id Token id.
+    @param amount Amount moved.
+    @return bool `True` per EIP-6909.
     """
     self._transfer(msg.sender, to, id, amount, msg.sender)
     return True
 
 
 @external
-def transferFrom(owner: address, to: address, id: uint256, amount: uint256):
+def transferFrom(
+    owner: address, to: address, id: uint256, amount: uint256
+) -> bool:
     """
-    @dev Transfers `amount` tokens of token `id` from `owner` to `to`.
-    @notice `owner` and `to` cannot be the zero address. `owner` must have
-            a balance of at least `amount`. The caller must be `owner`, an
-            operator for `owner` (`isOperator`), or have an allowance of at
-            least `amount` for token `id`. Allowance is not decreased
-            when the caller is `owner` or an operator. When allowance is
-            used and is not `max_value(uint256)`, it is decreased by `amount`.
-
-            WARNING: Infinite allowance (`max_value(uint256)`) is not decreased.
-    @param owner The 20-byte address debited by the transfer.
-    @param to The 20-byte receiver address.
-    @param id The 32-byte token id.
-    @param amount The 32-byte token amount to be transferred.
+    @dev EIP-6909 `transferFrom`: moves `amount` of `id` from `owner` to `to`.
+    @notice Caller must be `owner`, an operator, or have sufficient allowance. Allowance is
+            skipped for self/operator; infinite allowance (`max_value(uint256)`) is not reduced.
+            Reverts on insufficient balance; zero `to` is disallowed (`_transfer`).
+    @param owner Debited account.
+    @param to Recipient.
+    @param id Token id.
+    @param amount Amount moved.
+    @return bool `True` per EIP-6909.
     """
     if msg.sender != owner:
         if not self._operator_approvals[owner][msg.sender]:
             self._spend_allowance(owner, msg.sender, id, amount)
     self._transfer(owner, to, id, amount, msg.sender)
+    return True
 
 
 @external
-def approve(spender: address, id: uint256, amount: uint256):
+def approve(spender: address, id: uint256, amount: uint256) -> bool:
     """
-    @dev Sets the allowance of `spender` for token `id` of the caller
-         to `amount` and emits `Approval`.
-    @notice `spender` cannot be the zero address.
-    @param spender The 20-byte spender address.
-    @param id The 32-byte token id.
-    @param amount The 32-byte token amount `spender` may transfer on behalf
-           of the caller.
+    @dev EIP-6909 `approve`; emits `Approval`.
+    @notice zero address checks on `spender` reverts (`_approve`).
+    @param spender Delegate.
+    @param id Token id.
+    @param amount New allowance.
+    @return bool `True` per EIP-6909.
     """
     self._approve(msg.sender, spender, id, amount)
+    return True
 
+
+@external
+def setOperator(operator: address, approved: bool) -> bool:
+    """
+    @dev EIP-6909 `setOperator`; emits `OperatorSet`.
+    @param operator Account to approve or revoke.
+    @param approved New operator flag.
+    @return bool `True` per EIP-6909.
+    """
+    self._operator_approvals[msg.sender][operator] = approved
+    log IERC6909.OperatorSet(
+        _owner=msg.sender, _operator=operator, _approved=approved
+    )
+    return True
 
 
 @external
 def set_token_uri(id: uint256, token_uri: String[432]):
     """
-    @dev Sets the Uniform Resource Identifier (URI)
-         for token `id`.
-    @notice Decoupled from minting: further supply may be minted for the same
-            token id `id` later. Only addresses with `is_minter` may set URIs.
-    @param id The 32-byte token id.
-    @param token_uri The maximum 432-character user-readable
-           string URI segment combined with `_BASE_URI` in `tokenURI`.
+    @dev Sets per-token URI segment (concatenated with immutable `_BASE_URI` in `tokenURI`).
+    @notice Minters only; independent of mint timing.
+    @param id Token id.
+    @param token_uri Suffix segment (max 432 chars).
     """
-    assert self.is_minter[msg.sender], "erc6909: access is denied"
+    assert self._is_minter[msg.sender], "erc6909: access is denied"
     self._set_token_uri(id, token_uri)
 
 
 @external
 def burn(id: uint256, amount: uint256):
     """
-    @dev Destroys `amount` tokens of token `id` from the caller.
-    @notice `amount` cannot exceed the balance of token `id` of the caller.
-    @param id The 32-byte token id.
-    @param amount The 32-byte token amount to be burned.
+    @dev Burns `amount` of `id` from caller; decreases total supply.
+    @param id Token id.
+    @param amount Amount burned.
     """
     self._burn(msg.sender, id, amount)
 
@@ -283,52 +327,61 @@ def burn(id: uint256, amount: uint256):
 @external
 def burn_from(owner: address, id: uint256, amount: uint256):
     """
-    @dev Destroys `amount` tokens from `owner`,
-         deducting from the caller's allowance.
-    @notice Note that `owner` cannot be the
-            zero address. Also, the caller must
-            have an allowance for `owner`'s tokens
-            of at least `amount`.
-    @param owner The 20-byte owner address.
-    @param id The 32-byte token id.
-    @param amount The 32-byte token amount to be destroyed.
+    @dev Burns `amount` of `id` from `owner` using caller's allowance (`_spend_allowance` then `_burn`).
+    @notice Does not grant operator bypass; allowance must cover the burn.
+    @param owner Debited account.
+    @param id Token id.
+    @param amount Amount burned.
     """
     self._spend_allowance(owner, msg.sender, id, amount)
     self._burn(owner, id, amount)
 
 
 @external
-def mint(owner: address, id: uint256, amount: uint256):
+def create(name: String[25], symbol: String[5], decimals: uint8) -> uint256:
     """
-    @dev Creates `amount` tokens of token `id` and assigns them to `owner`.
-    @notice Only authorised minters can access this function.
-            Note that `owner` cannot be the zero address.
-    @param owner The 20-byte owner address.
-    @param id The 32-byte token id.
-    @param amount The 32-byte token amount to be created.
+    @dev Allocates the next id, stores metadata, emits `ERC6909MetadataSet`.
+    @notice Minters only.
+    @return uint256 New token id.
     """
-    assert self.is_minter[msg.sender], "erc6909: access is denied"
+    assert self._is_minter[msg.sender], "erc6909: access is denied"
+    token_id: uint256 = self._counter
+    self._counter = token_id + 1
+    self._token_metadata[token_id] = TokenMetadata(
+        name=name, symbol=symbol, decimals=decimals
+    )
+    log ERC6909MetadataSet(
+        id=token_id, name=name, symbol=symbol, decimals=decimals
+    )
+    return token_id
+
+
+@external
+def mint(owner: address, id: uint256, amount: uint256) -> uint256:
+    """
+    @dev Minter-only mint to `owner` for existing `id`.
+    @notice zero address checks on `owner` reverts (`_mint`).
+    @param owner Recipient.
+    @param id Token id.
+    @param amount Amount created.
+    @return uint256 `id` for convenience.
+    """
+    assert self._is_minter[msg.sender], "erc6909: access is denied"
     self._mint(owner, id, amount)
+    return id
 
 
 @external
 def set_minter(minter: address, status: bool):
     """
-    @dev Adds or removes an address `minter` to/from the
-         list of allowed minters. Note that only the
-         `owner` can add or remove `minter` addresses.
-         Also, the `minter` cannot be the zero address.
-         Eventually, the `owner` cannot remove himself
-         from the list of allowed minters.
-    @param minter The 20-byte minter address.
-    @param status The Boolean variable that sets the status.
+    @dev Owner-only minter flag. Cannot target zero address or the owner (`msg.sender`).
+    @param minter Address receiving minter role change.
+    @param status `True` to grant, `False` to revoke.
     """
     ownable._check_owner()
     assert minter != empty(address), "erc6909: minter is the zero address"
-    # We ensured in the previous step `ownable._check_owner`
-    # that `msg.sender` is the `owner`.
     assert minter != msg.sender, "erc6909: minter is owner address"
-    self.is_minter[minter] = status
+    self._is_minter[minter] = status
     log RoleMinterChanged(minter=minter, status=status)
 
 
@@ -349,259 +402,42 @@ def transfer_ownership(new_owner: address):
     ownable._check_owner()
     assert new_owner != empty(address), "erc6909: new owner is the zero address"
 
-    self.is_minter[msg.sender] = False
+    self._is_minter[msg.sender] = False
     log RoleMinterChanged(minter=msg.sender, status=False)
 
     ownable._transfer_ownership(new_owner)
-    self.is_minter[new_owner] = True
+    self._is_minter[new_owner] = True
     log RoleMinterChanged(minter=new_owner, status=True)
 
 
 @external
 def renounce_ownership():
     """
-    @dev Leaves the contract without an owner.
-    @notice Renouncing ownership will leave the
-            contract without an owner, thereby
-            removing any functionality that is
-            only available to the owner. Note
-            that the `owner` is also removed from
-            the list of allowed minters.
-
-            WARNING: All other existing `minter`
-            addresses will still be able to create
-            new tokens. Consider removing all non-owner
-            minter addresses first via `set_minter`
-            before calling `renounce_ownership`.
+    @dev Sets owner to zero and strips caller's minter flag (snekmate `renounce_ownership` path).
+    @notice Other minters remain able to mint; revoke them via `set_minter` first if undesired.
     """
     ownable._check_owner()
-    self.is_minter[msg.sender] = False
+    self._is_minter[msg.sender] = False
     log RoleMinterChanged(minter=msg.sender, status=False)
     ownable._transfer_ownership(empty(address))
 
 
-@external
-def set_name(id: uint256, new_name: String[25]):
-    """
-    @dev Sets the human-readable name for token `id`.
-    @param id The 32-byte token id.
-    @param new_name The maximum 25-character name of the token.
-    """
-    assert self.is_minter[msg.sender], "erc6909: access is denied"
-    self._token_metadata[id].name = new_name
-    log ERC6909NameUpdated(id=id, newName=new_name)
-
-
-@external
-def set_symbol(id: uint256, new_symbol: String[5]):
-    """
-    @dev Sets the ticker symbol for token `id`.
-    @param id The 32-byte token id.
-    @param new_symbol The maximum 5-character symbol of the token.
-    """
-    assert self.is_minter[msg.sender], "erc6909: access is denied"
-    self._token_metadata[id].symbol = new_symbol
-    log ERC6909SymbolUpdated(id=id, newSymbol=new_symbol)
-
-
-@external
-def set_decimals(id: uint256, new_decimals: uint8):
-    """
-    @dev Sets the number of decimal places used for amounts of token `id`.
-    @param id The 32-byte token id.
-    @param new_decimals The number of decimal places used for amounts of token `id`.
-    """
-    assert self.is_minter[msg.sender], "erc6909: access is denied"
-    self._token_metadata[id].decimals = new_decimals
-    log ERC6909DecimalsUpdated(id=id, newDecimals=new_decimals)
-
-
-@external
-@view
-def supportsInterface(interface_id: bytes4) -> bool:
-    """
-    @dev Returns `True` if this contract implements the
-         interface defined by `interface_id`.
-    @param interface_id The 4-byte interface identifier.
-    @return bool The verification whether the contract
-            implements the interface or not.
-    """
-    return interface_id in _SUPPORTED_INTERFACES
-
-
-@external
-@view
-def name(id: uint256) -> String[25]:
-    """
-    @dev Returns the human-readable name for token `id`.
-    @param id The 32-byte token id.
-    @return String The maximum 25-character name of the token
-            id `id`.
-    """
-    return self._token_metadata[id].name
-
-
-@external
-@view
-def symbol(id: uint256) -> String[5]:
-    """
-    @dev Returns the ticker symbol for token `id`.
-    @param id The 32-byte token id.
-    @return String The maximum 5-character symbol of the token
-            id `id`.
-    """
-    return self._token_metadata[id].symbol
-
-
-@external
-@view
-def decimals(id: uint256) -> uint8:
-    """
-    @dev Returns the number of decimal places used for amounts
-         of token `id`.
-    @param id The 32-byte token id.
-    @return uint8 The decimals value for token id `id`.
-    """
-    return self._token_metadata[id].decimals
-
-
-@external
-@view
-def balanceOf(owner: address, id: uint256) -> uint256:
-    """
-    @dev Returns the amount of tokens of token
-         id `id` owned by `owner`.
-    @param owner The 20-byte owner address.
-    @param id The 32-byte token id.
-    @return uint256 The 32-byte token amount owned
-            by `owner`.
-    """
-    return self._balances[owner][id]
-
-
-@external
-@view
-def allowance(owner: address, spender: address, id: uint256) -> uint256:
-    """
-    @dev Returns the amount of tokens of token
-         id `id` that `spender` is allowed to spend on
-         behalf of `owner`.
-    @param owner The 20-byte owner address.
-    @param spender The 20-byte spender address.
-    @param id The 32-byte token id.
-    @return uint256 The 32-byte token amount that `spender`
-            is allowed to spend on behalf of `owner`.
-    """
-    return self._allowances[owner][spender][id]
-
-
-@external
-@view
-def isOperator(owner: address, operator: address) -> bool:
-    """
-    @dev Returns `True` if `operator` is approved to transfer
-         any amount of any token id on behalf of `owner`.
-    @param owner The 20-byte owner address.
-    @param operator The 20-byte operator address.
-    @return bool The verification whether `operator` is approved
-            or not.
-    """
-    return self._operator_approvals[owner][operator]
-
-
-@external
-def setOperator(operator: address, approved: bool) -> bool:
-    """
-    @dev Grants or revokes unlimited transfer permissions for `operator`
-         for any token id on behalf of the caller.
-    @notice MUST set the operator status to `approved`.
-            MUST log the `OperatorSet` event.
-            MUST return `True`.
-    @param operator The 20-byte operator address.
-    @param approved The new operator approval status for `operator`.
-    @return bool Always returns `True`.
-    """
-    self._operator_approvals[msg.sender][operator] = approved
-    log IERC6909.OperatorSet(
-        _owner=msg.sender, _operator=operator, _approved=approved
-    )
-    return True
-
-
-@external
-@view
-def contractURI() -> String[512]:
-    """
-    @dev Returns the Uniform Resource Identifier (URI) for the contract.
-    @return String The maximum 512-character user-readable
-            string contract URI.
-    """
-    return _CONTRACT_URI
-    
-
-@external
-@view
-def tokenURI(id: uint256) -> String[512]:
-    """
-    @dev Returns the Uniform Resource Identifier (URI)
-         for token `id`.
-    @notice If the `{id}` substring is present in the URI,
-            it must be replaced by clients with the actual
-            token id. Note that the `tokenURI` function must
-            not be used to check for the existence of a token
-            as it is possible for the implementation to return
-            a valid string even if the token does not exist.
-    @param id The 32-byte token id.
-    @return String The maximum 512-character user-readable
-            string token URI for token id `id`.
-    """
-    return self._token_uri(id)
-
-
-@external
-@view
-def exists(id: uint256) -> bool:
-    """
-    @dev Returns whether token id `id` exists: `True` if total supply
-         for `id` is non-zero (`totalSupply(id) != 0`).
-    @param id The 32-byte token id.
-    @return bool Whether any amount of token id `id` has been minted.
-    """
-    return self._total_supply[id] != empty(uint256)
-
-
-@external
-@view
-def totalSupply(id: uint256) -> uint256:
-    """
-    @dev Returns the total supply of token id `id` (token supply extension).
-    @param id The 32-byte token id.
-    @return uint256 The cumulative minted amount for `id`.
-    """
-    return self._total_supply[id]
-
-
 @internal
-def _before_token_transfer(owner: address, to: address, id: uint256, amount: uint256):
+def _before_token_transfer(
+    owner: address, to: address, id: uint256, amount: uint256
+):
     """
-    @dev Hook called before any transfer of token id `id`; no-op here.
-         Override via inheritance patterns if extending this contract.
-    @param owner The 20-byte address debited by the transfer.
-    @param to The 20-byte receiver address.
-    @param id The 32-byte token id.
-    @param amount The 32-byte token amount moved.
+    @dev Pre-transfer hook; no-op (override in a derived contract if needed).
     """
     pass
 
 
 @internal
-def _after_token_transfer(owner: address, to: address, id: uint256, amount: uint256):
+def _after_token_transfer(
+    owner: address, to: address, id: uint256, amount: uint256
+):
     """
-    @dev Hook called after any transfer of token id `id`; no-op here.
-    @param owner The 20-byte address debited by the transfer.
-    @param to The 20-byte receiver address.
-    @param id The 32-byte token id.
-    @param amount The 32-byte token amount moved.
+    @dev Post-transfer hook; no-op (override in a derived contract if needed).
     """
     pass
 
@@ -609,15 +445,8 @@ def _after_token_transfer(owner: address, to: address, id: uint256, amount: uint
 @internal
 def _mint(owner: address, id: uint256, amount: uint256):
     """
-    @dev Creates `amount` tokens and assigns
-         them to `owner`, increasing the
-         total supply.
-    @notice This is an `internal` function without
-            access restriction. Note that `owner`
-            cannot be the zero address.
-    @param owner The 20-byte owner address.
-    @param id The 32-byte token id.
-    @param amount The 32-byte token amount to be created.
+    @dev Increases `_total_supply` and `_balances`; emits mint-shaped `Transfer` (`_from` zero).
+    @notice zero address checks on `owner` reverts. `_caller` in the event is zero (internal path).
     """
     assert owner != empty(address), "erc20: mint to the zero address"
 
@@ -625,23 +454,22 @@ def _mint(owner: address, id: uint256, amount: uint256):
 
     self._total_supply[id] = unsafe_add(self._total_supply[id], amount)
     self._balances[owner][id] = unsafe_add(self._balances[owner][id], amount)
-    log IERC6909.Transfer(_caller=empty(address), _from=empty(address), _to=owner, _id=id, _value=amount)
+    log IERC6909.Transfer(
+        _caller=empty(address),
+        _from=empty(address),
+        _to=owner,
+        _id=id,
+        _value=amount,
+    )
 
     self._after_token_transfer(empty(address), owner, id, amount)
-
 
 
 @internal
 def _burn(owner: address, id: uint256, amount: uint256):
     """
-    @dev Destroys `amount` tokens of token `id` from `owner`,
-         reducing the total supply.
-    @notice Note that `owner` cannot be the
-            zero address. Also, `owner` must
-            have at least `amount` tokens.
-    @param owner The 20-byte owner address.
-    @param id The 32-byte token id.
-    @param amount The 32-byte token amount to be destroyed.
+    @dev Decreases balance and supply; emits burn-shaped `Transfer` (`_to` zero).
+    @notice zero address checks on `owner` reverts; `amount` must not exceed balance.
     """
     assert owner != empty(address), "erc20: burn from the zero address"
 
@@ -651,7 +479,9 @@ def _burn(owner: address, id: uint256, amount: uint256):
     assert account_balance >= amount, "erc6909: burn amount exceeds balance"
     self._balances[owner][id] = unsafe_sub(account_balance, amount)
     self._total_supply[id] = unsafe_sub(self._total_supply[id], amount)
-    log IERC6909.Transfer(_caller=owner, _from=owner, _to=empty(address), _id=id, _value=amount)
+    log IERC6909.Transfer(
+        _caller=owner, _from=owner, _to=empty(address), _id=id, _value=amount
+    )
 
     self._after_token_transfer(owner, empty(address), id, amount)
 
@@ -659,14 +489,8 @@ def _burn(owner: address, id: uint256, amount: uint256):
 @internal
 def _approve(owner: address, spender: address, id: uint256, amount: uint256):
     """
-    @dev Sets the allowance of `spender` for token `id` of `owner`
-         to `amount` and emits `IERC6909.Approval`.
-    @notice `owner` and `spender` cannot be the zero address.
-    @param owner The 20-byte owner address.
-    @param spender The 20-byte spender address.
-    @param id The 32-byte token id.
-    @param amount The 32-byte token amount `spender` may transfer on
-           behalf of `owner` for this token `id`.
+    @dev Writes allowance and emits `Approval`
+    @notice zero address checks on `owner` or `spender` reverts.
     """
     assert owner != empty(address), "erc6909: approve from the zero address"
     assert spender != empty(address), "erc6909: approve to the zero address"
@@ -680,17 +504,8 @@ def _transfer(
     owner: address, to: address, id: uint256, amount: uint256, caller: address
 ):
     """
-    @dev Moves `amount` of token `id` from `owner` to `to`.
-    @notice Runs `_before_token_transfer` then `_after_token_transfer`.
-            Emits `IERC6909.Transfer` with `_caller`, `_from`, `_to`,
-            `_id`, and `_value` per the interface. `owner` and `to`
-            cannot be zero; `owner` must have sufficient balance.
-    @param owner The 20-byte address debited by the transfer.
-    @param to The 20-byte receiver address.
-    @param id The 32-byte token id.
-    @param amount The 32-byte token amount to be transferred.
-    @param caller The 20-byte address that initiated the transfer
-           (`msg.sender` for external entrypoints).
+    @dev Core transfer: hooks, balance checks, `Transfer` with `_caller` as given (typically `msg.sender`).
+    @notice Zero address checks on `owner` or `to` reverts.
     """
     assert owner != empty(address), "erc6909: transfer from the zero address"
     assert to != empty(address), "erc6909: transfer to the zero address"
@@ -709,44 +524,24 @@ def _transfer(
 
 
 @internal
-def _spend_allowance(owner: address, spender: address, id: uint256, amount: uint256):
+def _spend_allowance(
+    owner: address, spender: address, id: uint256, amount: uint256
+):
     """
-    @dev Decreases `spender`'s allowance on token `id` for `owner`
-         by `amount` when the stored allowance is less than `max_value(uint256)`.
-    @notice Does not decrease allowance when it equals `max_value(uint256)`.
-            Reverts if the current allowance is below `amount` (except on
-            infinite allowance). The `amount` parameter is the transfer size,
-            not the remaining allowance.
-    @param owner The 20-byte owner address.
-    @param spender The 20-byte spender address.
-    @param id The 32-byte token id.
-    @param amount The 32-byte token amount to consume from the allowance.
+    @dev Pulls `amount` from `(owner, spender, id)` allowance unless unlimited.
+    @notice No-op on `max_value(uint256)`; otherwise requires `allowance >= amount` then subtracts.
     """
     current_allowance: uint256 = self._allowances[owner][spender][id]
     if current_allowance < max_value(uint256):
-        # The following line allows the commonly known address
-        # poisoning attack, where `transferFrom` instructions
-        # are executed from arbitrary addresses with an `amount`
-        # of `0`. However, this poisoning attack is not an on-chain
-        # vulnerability. All assets are safe. It is an off-chain
-        # log interpretation issue.
+        # Allows `transferFrom` with `amount == 0` from any `msg.sender` (zero decrement allowed).
         assert current_allowance >= amount, "erc6909: insufficient allowance"
         self._approve(owner, spender, id, unsafe_sub(current_allowance, amount))
-
 
 
 @internal
 def _set_token_uri(id: uint256, token_uri: String[432]):
     """
-    @dev Sets the Uniform Resource Identifier (URI)
-         for token `id`.
-    @notice This is an `internal` function without access
-            restriction. This function is decoupled from
-            `_mint`, as multiple of the same `id` can be
-            minted.
-    @param id The 32-byte token id.
-    @param token_uri The maximum 432-character user-readable
-           string URI segment for `tokenURI`.
+    @dev Stores per-id URI segment; callers must enforce auth (e.g. `set_token_uri`).
     """
     self._token_uris[id] = token_uri
 
@@ -755,36 +550,17 @@ def _set_token_uri(id: uint256, token_uri: String[432]):
 @view
 def _token_uri(id: uint256) -> String[512]:
     """
-    @dev An `internal` helper function that returns the Uniform
-         Resource Identifier (URI) for token `id`.
-    @notice If the `{id}` substring is present in the URI,
-            it must be replaced by clients with the actual
-            token `id`. Do not use `tokenURI` to infer
-            token existence; a non-empty URI does not imply
-            a positive balance or supply.
-    @param id The 32-byte token id.
-    @return String The maximum 512-character user-readable
-            string token URI for token id `id`.
+    @dev Builds full `tokenURI`: `token_uri` only, or `base || token_uri`, or `base || dec(id)` fallback.
+    @notice If `_BASE_URI` contains `{id}`, consider returning it verbatim per EIP client substitution.
     """
     token_uri: String[432] = self._token_uris[id]
 
     base_uri_length: uint256 = len(_BASE_URI)
-    # If there is no base URI, return the token URI.
     if base_uri_length == empty(uint256):
         return token_uri
-    # If both are set, concatenate the base URI
-    # and token URI.
     elif len(token_uri) != empty(uint256):
         return concat(_BASE_URI, token_uri)
-    # If there is no token URI but a base URI,
-    # concatenate the base URI and token id.
     elif base_uri_length != empty(uint256):
-        # Please note that for projects where the
-        # substring `{id}` is present in the URI
-        # and this URI is to be set as `_BASE_URI`,
-        # it is recommended to remove the following
-        # concatenation and simply return `_BASE_URI`
-        # for easier off-chain handling.
         return concat(_BASE_URI, uint2str(id))
 
     return ""

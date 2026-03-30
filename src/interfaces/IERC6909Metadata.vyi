@@ -60,10 +60,9 @@ def supportsInterface(interfaceId: bytes4) -> bool:
 @view
 def name(_id: uint256) -> String[25]:
     """
-    @dev Returns the human-readable name for token `_id`.
+    @dev The name for a token `_id`.
     @param _id The 32-byte token id.
-    @return String The maximum 25-character name of the token
-            id `_id`.
+    @return String The maximum 25-character name for token `_id`.
     """
     ...
 
@@ -72,10 +71,9 @@ def name(_id: uint256) -> String[25]:
 @view
 def symbol(_id: uint256) -> String[5]:
     """
-    @dev Returns the ticker symbol for token `_id`.
+    @dev The ticker symbol for a token `_id`.
     @param _id The 32-byte token id.
-    @return String The maximum 5-character symbol of the token
-            id `_id`.
+    @return String The maximum 5-character symbol for token `_id`.
     """
     ...
 
@@ -84,9 +82,8 @@ def symbol(_id: uint256) -> String[5]:
 @view
 def decimals(_id: uint256) -> uint8:
     """
-    @dev Returns the number of decimal places used for amounts
-         of token `_id`.
+    @dev The amount of decimals for a token `_id`.
     @param _id The 32-byte token id.
-    @return uint8 The decimals value for token id `_id`.
+    @return uint8 The decimals count for token `_id`.
     """
     ...

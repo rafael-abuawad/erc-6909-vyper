@@ -30,8 +30,10 @@ from ethereum.ercs import IERC165
 implements: IERC165
 
 
-# @dev Emitted when `_value` of token `_id` is
-# transferred from `_from` to `_to` by `_caller`.
+# @dev The `_caller` initiates a transfer of `_value` of token `_id` from `_from` to `_to`.
+#      MUST be logged when an amount of a token id is transferred from one account to another.
+#      MUST be logged with `_from` as the zero address when an amount of a token id is minted.
+#      MUST be logged with `_to` as the zero address when an amount of a token id is burned.
 event Transfer:
     _caller: address
     _from: indexed(address)
@@ -40,17 +42,17 @@ event Transfer:
     _value: uint256
 
 
-# @dev Emitted when `_owner` grants or revokes permission
-# to `_operator` to transfer their tokens, according to
-# `_approved`.
+# @dev The `_owner` has set the `_approved` status for `_operator`.
+#      MUST be logged when the operator status is set.
+#      MAY be logged when the operator status is set to the same value as before the call.
 event OperatorSet:
     _owner: indexed(address)
     _operator: indexed(address)
     _approved: bool
 
 
-# @dev Emitted when `_owner` sets the allowance for
-# `_spender` on token `_id` to `_value`.
+# @dev The `_owner` has approved `_spender` to transfer `_value` of token `_id` on the owner's behalf.
+#      MUST be logged when the allowance is set by `_owner`.
 event Approval:
     _owner: indexed(address)
     _spender: indexed(address)
@@ -64,12 +66,12 @@ def supportsInterface(interfaceId: bytes4) -> bool:
     """
     @dev Returns `True` if this contract implements the
          interface defined by `interfaceId`.
-    @notice For more details on how these identifiers are
-            created, please refer to:
+    @notice ERC-6909 requires ERC-165; compliant contracts also
+            return `True` for the ERC-6909 interface id `0x0f632fb3`.
+            For how identifiers are created, see
             https://eips.ethereum.org/EIPS/eip-165.
     @param interfaceId The 4-byte interface identifier.
-    @return bool The verification whether the contract
-            implements the interface or not.
+    @return bool Whether the contract implements `interfaceId`.
     """
     ...
 
@@ -78,12 +80,10 @@ def supportsInterface(interfaceId: bytes4) -> bool:
 @view
 def balanceOf(_owner: address, _id: uint256) -> uint256:
     """
-    @dev Returns the total amount of token `_id`
-         that `_owner` owns.
+    @dev The total amount of token `_id` that `_owner` owns.
     @param _owner The 20-byte owner address.
     @param _id The 32-byte token id.
-    @return uint256 The total amount of token id `_id` owned by
-            `_owner`.
+    @return uint256 The total amount of token `_id` owned by `_owner`.
     """
     ...
 
@@ -92,14 +92,12 @@ def balanceOf(_owner: address, _id: uint256) -> uint256:
 @view
 def allowance(_owner: address, _spender: address, _id: uint256) -> uint256:
     """
-    @dev Returns the total amount of token `_id`
-         that `_spender` is permitted to transfer on
-         behalf of `_owner`.
+    @dev The total amount of token `_id` that `_spender` is permitted
+         to transfer on behalf of `_owner`.
     @param _owner The 20-byte owner address.
     @param _spender The 20-byte spender address.
     @param _id The 32-byte token id.
-    @return uint256 The total amount of token `_id` that `_spender`
-            is permitted to transfer on behalf of `_owner`.
+    @return uint256 The allowance of `_spender` for token `_id` for `_owner`.
     """
     ...
 
@@ -108,12 +106,10 @@ def allowance(_owner: address, _spender: address, _id: uint256) -> uint256:
 @view
 def isOperator(_owner: address, _operator: address) -> bool:
     """
-    @dev Returns `True` if `_operator` is approved as an
-         operator for `_owner`.
+    @dev Returns `True` if `_operator` is approved as an operator for `_owner`.
     @param _owner The 20-byte owner address.
-    @param _operator The 20-byte operator address.
-    @return bool Whether `_operator` is approved as an operator for
-            `_owner`.
+    @param _operator The 20-byte operator (spender) address.
+    @return bool Operator approval status for `_operator` on behalf of `_owner`.
     """
     ...
 
@@ -123,6 +119,8 @@ def setOperator(_operator: address, _approved: bool) -> bool:
     """
     @dev Grants or revokes unlimited transfer permissions for `_operator`
          for any token id on behalf of the caller.
+    @notice MUST set the operator status to `_approved`, MUST log `OperatorSet`,
+            MUST return `True`.
     @param _operator The 20-byte operator (spender) address.
     @param _approved The new operator approval status for `_operator`.
     @return bool Always returns `True` on success.
@@ -133,15 +131,13 @@ def setOperator(_operator: address, _approved: bool) -> bool:
 @external
 def transfer(_to: address, _id: uint256, _value: uint256) -> bool:
     """
-    @dev Transfers `_value` of token `_id` from the
-         caller to `_to`.
-    @notice Note that `_to` cannot be the zero address. Also,
-            the caller must have a total amount of token `_id`
-            of at least `_value`.
+    @dev Transfers `_value` of token `_id` from the caller to `_to`.
+    @notice MUST revert when the caller's balance for token `_id` is insufficient.
+            MUST log `Transfer`. MUST return `True`.
     @param _to The 20-byte receiver address.
     @param _id The 32-byte token id.
-    @param _value The 32-byte amount of token `_id`
-           transferred.
+    @param _value The 32-byte amount of token `_id` to transfer.
+    @return bool Always returns `True` on success.
     """
     ...
 
@@ -151,22 +147,19 @@ def transferFrom(
     _from: address, _to: address, _id: uint256, _value: uint256
 ) -> bool:
     """
-    @dev Transfers `_value` of token `_id` from
-         `_from` to `_to`.
-    @notice Note that `_from` and `_to` cannot be the zero
-            address. Also, `_from` must have a total amount of
-            token `_id` of at least `_value`. The caller must
-            be `_from`, an operator for `_from`, or have an
-            allowance of at least `_value` for token `_id` on
-            behalf of `_from`. If the caller is not an operator
-            for `_from` and allowance is not infinite, the
-            allowance is decreased by `_value` (SHOULD NOT be
-            decreased if the caller is `_from` or an operator).
-    @param _from The 20-byte address debited by the transfer.
+    @dev Transfers `_value` of token `_id` from `_from` to `_to` by the caller.
+    @notice MUST revert when the caller is neither `_from` nor an operator for `_from`
+            and the caller's allowance for token `_id` for `_from` is insufficient.
+            MUST revert when `_from`'s balance for token `_id` is insufficient.
+            MUST log `Transfer`. MUST decrease the caller's allowance by `_value`
+            when the caller is not an operator for `_from` and the allowance is not infinite.
+            SHOULD NOT decrease allowance when it is infinite. SHOULD NOT decrease allowance
+            when the caller is an operator or `_from`. MUST return `True`.
+    @param _from The 20-byte sender address.
     @param _to The 20-byte receiver address.
     @param _id The 32-byte token id.
-    @param _value The 32-byte amount of token `_id`
-           transferred.
+    @param _value The 32-byte amount of token `_id` to transfer.
+    @return bool Always returns `True` on success.
     """
     ...
 
@@ -174,15 +167,12 @@ def transferFrom(
 @external
 def approve(_spender: address, _id: uint256, _value: uint256) -> bool:
     """
-    @dev Sets the allowance of `_spender` for token `_id`
-         of the caller to `_value`.
-    @notice MUST set the allowance of `_spender` for token
-            `_id` for the caller to `_value` and MUST log
-            the `Approval` event.
+    @dev Approves `_value` of token `_id` that `_spender` may transfer on behalf of the caller.
+    @notice MUST set the allowance of `_spender` for token `_id` for the caller to `_value`,
+            MUST log `Approval`, MUST return `True`.
     @param _spender The 20-byte spender address.
     @param _id The 32-byte token id.
-    @param _value The 32-byte amount of token `_id` that
-           `_spender` is permitted to transfer on behalf of the
-           caller.
+    @param _value The 32-byte allowance amount for `_spender` on token `_id`.
+    @return bool Always returns `True` on success.
     """
     ...

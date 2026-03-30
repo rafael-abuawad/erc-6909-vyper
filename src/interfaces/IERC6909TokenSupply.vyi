@@ -59,10 +59,9 @@ def supportsInterface(interfaceId: bytes4) -> bool:
 @view
 def totalSupply(_id: uint256) -> uint256:
     """
-    @dev Returns the total supply of token id `_id`.
-    @notice Part of the optional Token Supply extension; this
-            is the cumulative amount for `_id` per EIP-6909.
+    @dev The totalSupply for a token `_id`.
+    @notice Optional Token Supply extension per EIP-6909.
     @param _id The 32-byte token id.
-    @return uint256 The total supply of token id `_id`.
+    @return uint256 The total supply (`totalSupply`) for token `_id`.
     """
     ...
