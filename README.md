@@ -5,7 +5,9 @@
   </picture>
 </p>
 
-# erc-6909-vyper
+---
+
+# ERC6909 Vyper
 
 Gas-efficient, extended Vyper module for the [EIP-6909](https://eips.ethereum.org/EIPS/eip-6909): a minimal multi-token standard with optional **metadata**, **content URI**, and **total supply** extensions. The main contract composes multiple `.vyi` interfaces and [snekmate](https://github.com/pcaversaccio/snekmate) `ownable`, adds minter controls, mint/burn hooks, and helpers documented in the NatSpec of [`src/erc6909.vy`](src/erc6909.vy).
 
