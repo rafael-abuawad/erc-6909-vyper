@@ -1,0 +1,87 @@
+# pragma version ~=0.4.3
+"""
+@title EIP-6909 Optional Content URI Interface Definition
+@custom:contract-name IERC6909ContentURI
+@license GNU Affero General Public License v3.0 only
+@author rafael-abuawad
+@notice The Content URI extension is optional for an ERC-6909
+        smart contract. It exposes a URI for contract-level
+        metadata and a URI for each token type `id`. For more
+        details, please refer to:
+        https://eips.ethereum.org/EIPS/eip-6909#content-uri-extension.
+
+        Note that Vyper interfaces that implement functions
+        with return values that require an upper bound (e.g.
+        `Bytes`, `DynArray`, or `String`), the upper bound
+        defined in the interface represents the lower bound
+        of the implementation:
+        https://github.com/vyperlang/vyper/pull/3205.
+
+        On how to use interfaces in Vyper, please visit:
+        https://vyper.readthedocs.io/en/latest/interfaces.html#interfaces.
+"""
+
+
+# @dev We import and implement the `IERC165` interface,
+# which is a built-in interface of the Vyper compiler.
+from ethereum.ercs import IERC165
+implements: IERC165
+
+
+# @dev We import the `IERC6909` interface, which is written
+# using standard Vyper syntax, to highlight the association
+# of the custom `IERC6909ContentURI` interface with the custom
+# `IERC6909` interface.
+# @notice The interface `IERC6909ContentURI` must be used in
+# conjunction with the custom interface `IERC6909` to be EIP-6909
+# compatible. If you want to use this interface as a stand-alone
+# interface, you must add `implements: IERC6909` to this interface
+# and implement all required events and functions accordingly.
+from . import IERC6909
+
+
+@external
+@view
+def supportsInterface(interfaceId: bytes4) -> bool:
+    """
+    @dev Returns `True` if this contract implements the
+         interface defined by `interfaceId`.
+    @notice For more details on how these identifiers are
+            created, please refer to:
+            https://eips.ethereum.org/EIPS/eip-165.
+    @param interfaceId The 4-byte interface identifier.
+    @return bool The verification whether the contract
+            implements the interface or not.
+    """
+    ...
+
+
+@external
+@view
+def contractURI() -> String[512]:
+    """
+    @dev Returns the Uniform Resource Identifier (URI) for
+         contract-level metadata.
+    @return String The maximum 512-character user-readable
+            string contract URI.
+    """
+    ...
+
+
+@external
+@view
+def tokenURI(_id: uint256) -> String[512]:
+    """
+    @dev Returns the Uniform Resource Identifier (URI)
+         for token type `_id`.
+    @notice If the `{id}` substring is present in the URI,
+            it must be replaced by clients with the actual
+            token type ID. Note that the `tokenURI` function must
+            not be used to check for the existence of a token
+            as it is possible for an implementation to return
+            a valid string even if the token does not exist.
+    @param _id The 32-byte identifier of the token type `_id`.
+    @return String The maximum 512-character user-readable
+            string token URI of the token type `_id`.
+    """
+    ...

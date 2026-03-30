@@ -1,0 +1,92 @@
+# pragma version ~=0.4.3
+"""
+@title EIP-6909 Optional Metadata Interface Definition
+@custom:contract-name IERC6909Metadata
+@license GNU Affero General Public License v3.0 only
+@author rafael-abuawad
+@notice The metadata extension is optional for an ERC-6909
+        smart contract. It exposes a human-readable name,
+        ticker symbol, and decimals count for each token type
+        `id`. For more details, please refer to:
+        https://eips.ethereum.org/EIPS/eip-6909#metadata-extension.
+
+        Note that Vyper interfaces that implement functions
+        with return values that require an upper bound (e.g.
+        `Bytes`, `DynArray`, or `String`), the upper bound
+        defined in the interface represents the lower bound
+        of the implementation:
+        https://github.com/vyperlang/vyper/pull/3205.
+
+        On how to use interfaces in Vyper, please visit:
+        https://vyper.readthedocs.io/en/latest/interfaces.html#interfaces.
+"""
+
+
+# @dev We import and implement the `IERC165` interface,
+# which is a built-in interface of the Vyper compiler.
+from ethereum.ercs import IERC165
+implements: IERC165
+
+
+# @dev We import the `IERC6909` interface, which is written
+# using standard Vyper syntax, to highlight the association
+# of the custom `IERC6909Metadata` interface with the custom
+# `IERC6909` interface.
+# @notice The interface `IERC6909Metadata` must be used in
+# conjunction with the custom interface `IERC6909` to be EIP-6909
+# compatible. If you want to use this interface as a stand-alone
+# interface, you must add `implements: IERC6909` to this interface
+# and implement all required events and functions accordingly.
+from . import IERC6909
+
+
+@external
+@view
+def supportsInterface(interfaceId: bytes4) -> bool:
+    """
+    @dev Returns `True` if this contract implements the
+         interface defined by `interfaceId`.
+    @notice For more details on how these identifiers are
+            created, please refer to:
+            https://eips.ethereum.org/EIPS/eip-165.
+    @param interfaceId The 4-byte interface identifier.
+    @return bool The verification whether the contract
+            implements the interface or not.
+    """
+    ...
+
+
+@external
+@view
+def name(_id: uint256) -> String[25]:
+    """
+    @dev Returns the human-readable name for token type `_id`.
+    @param _id The 32-byte identifier of the token type.
+    @return String The maximum 25-character name of the token
+            type `_id`.
+    """
+    ...
+
+
+@external
+@view
+def symbol(_id: uint256) -> String[5]:
+    """
+    @dev Returns the ticker symbol for token type `_id`.
+    @param _id The 32-byte identifier of the token type.
+    @return String The maximum 5-character symbol of the token
+            type `_id`.
+    """
+    ...
+
+
+@external
+@view
+def decimals(_id: uint256) -> uint8:
+    """
+    @dev Returns the number of decimal places used for amounts
+         of token type `_id`.
+    @param _id The 32-byte identifier of the token type.
+    @return uint8 The decimals value for token type `_id`.
+    """
+    ...
