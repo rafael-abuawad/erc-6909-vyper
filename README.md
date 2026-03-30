@@ -1,52 +1,85 @@
-# ERC-6909 (Vyper)
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="vyper-logo-dark.png">
+    <img src="vyper-logo.png" width="140" alt="Vyper logo">
+  </picture>
+</p>
 
-Gas-efficient [EIP-6909](https://eips.ethereum.org/EIPS/eip-6909) multi-token implementation in Vyper, with optional metadata, content URI, and total-supply extensions. Core transfers, allowances, and operator semantics follow the standard; the main contract also layers snekmate `ownable` plus minter controls, mint/burn hooks, and helpers described in the NatSpec of [`src/erc6909.vy`](src/erc6909.vy).
+# erc-6909-vyper
 
-## Standards and interfaces
+Gas-efficient, extended Vyper module for the [EIP-6909](https://eips.ethereum.org/EIPS/eip-6909): a minimal multi-token standard with optional **metadata**, **content URI**, and **total supply** extensions. The main contract composes multiple `.vyi` interfaces and [snekmate](https://github.com/pcaversaccio/snekmate) `ownable`, adds minter controls, mint/burn hooks, and helpers documented in the NatSpec of [`src/erc6909.vy`](src/erc6909.vy).
 
-- **ERC-165** — `supportsInterface` via built-in `IERC165`
-- **ERC-6909** — [`src/interfaces/IERC6909.vyi`](src/interfaces/IERC6909.vyi)
-- **Content URI** — [`src/interfaces/IERC6909ContentURI.vyi`](src/interfaces/IERC6909ContentURI.vyi)
-- **Metadata** (`name` / `symbol` / `decimals` per token id) — [`src/interfaces/IERC6909Metadata.vyi`](src/interfaces/IERC6909Metadata.vyi)
-- **Token supply** — [`src/interfaces/IERC6909TokenSupply.vyi`](src/interfaces/IERC6909TokenSupply.vyi)
+## Contracts
 
-Declared interface IDs are listed in `_SUPPORTED_INTERFACES` in [`src/erc6909.vy`](src/erc6909.vy).
+| Path | Description |
+|------|-------------|
+| [`src/erc6909.vy`](src/erc6909.vy) | Main token implementation (ERC-165, ERC-6909, extensions, ownable, minter hooks) |
+| [`src/interfaces/IERC6909.vyi`](src/interfaces/IERC6909.vyi) | Core ERC-6909 interface |
+| [`src/interfaces/IERC6909ContentURI.vyi`](src/interfaces/IERC6909ContentURI.vyi) | Content URI extension |
+| [`src/interfaces/IERC6909Metadata.vyi`](src/interfaces/IERC6909Metadata.vyi) | Metadata extension |
+| [`src/interfaces/IERC6909TokenSupply.vyi`](src/interfaces/IERC6909TokenSupply.vyi) | Token supply extension |
+| [`src/mocks/erc6909_mock.vy`](src/mocks/erc6909_mock.vy) | Mock that initialises the module (used by tests and [`script/deploy.py`](script/deploy.py)) |
+| [`moccasin.toml`](moccasin.toml) | Moccasin project config (e.g. snekmate dependency, networks) |
 
-## Layout
+**Standards:** [EIP-165](https://eips.ethereum.org/EIPS/eip-165) via built-in `IERC165`; EIP-6909 and the optional extensions above. Declared interface IDs are listed in `_SUPPORTED_INTERFACES` in [`src/erc6909.vy`](src/erc6909.vy).
 
-| Path | Purpose |
-|------|---------|
-| [`src/erc6909.vy`](src/erc6909.vy) | Main token implementation |
-| [`src/interfaces/`](src/interfaces/) | `.vyi` interface files |
-| [`src/mocks/erc6909_mock.vy`](src/mocks/erc6909_mock.vy) | Mock for testing/integration |
-| [`moccasin.toml`](moccasin.toml) | Moccasin project config (e.g. snekmate dependency) |
+## Dependencies
 
-## Tooling
+- [Vyper](https://docs.vyperlang.org/) `~=0.4.3` (see contract pragmas)
+- [Moccasin](https://github.com/Cyfrin/moccasin) (build, test, deploy)
+- [snekmate](https://github.com/pcaversaccio/snekmate) `>=0.1.2` (`ownable` module)
+- [Titanoboa](https://github.com/vyperlang/titanoboa) (`boa`, test backend via Moccasin)
 
-- **Vyper** — `pragma version ~=0.4.3` (see contracts)
-- **Moccasin** — project orchestration ([documentation](https://cyfrin.github.io/moccasin))
-- **snekmate** — `ownable` module (declared in `moccasin.toml`)
+## Install
 
-## Development
+```bash
+pip install moccasin
+mox install
+```
 
-Compile the project (outputs under `out/`):
+
+
+## Build
 
 ```bash
 mox compile
 ```
 
-Run `mox --help` for other commands (`test`, `run`, `deploy`, etc.).
+Artifacts are written under `out/`.
 
-**Note:** The default `script/deploy.py` and `tests/` fixtures still follow the upstream Moccasin Counter template and are not wired to `erc6909`. Until those are updated, use `mox compile` (or a custom script) as the reliable path to build this contract.
-
-## Function selectors (Foundry)
-
-[`cast sig`](https://book.getfoundry.sh/reference/cast/cast-sig) prints each function’s **selector**: the first four bytes of `keccak256` of the canonical ABI signature. Under [EIP-165](https://eips.ethereum.org/EIPS/eip-165), an **interface identifier** is the bitwise XOR of every selector in that interface. The values exposed by `supportsInterface` on this contract are the fixed `bytes4` entries in `_SUPPORTED_INTERFACES` in [`src/erc6909.vy`](src/erc6909.vy), not the output of a single `cast sig` call.
-
-Commands used to generate selectors for the public methods that make up these interfaces:
+## Test
 
 ```bash
-# IERC6909 
+mox test
+```
+
+[`tests/conftest.py`](tests/conftest.py) deploys [`src/mocks/erc6909_mock.vy`](src/mocks/erc6909_mock.vy) via [`script/deploy.py`](script/deploy.py). The mock wraps the [`src/erc6909.vy`](src/erc6909.vy) module for a concrete constructor and tests; production deployment of the bare module differs (constructor/initialisation per your integration).
+
+## Deploy
+
+```bash
+mox run deploy
+```
+
+Deploys the mock from [`script/deploy.py`](script/deploy.py) (see `base_uri` / `contract_uri` there). For a live network, add or use a `[networks.*]` section in [`moccasin.toml`](moccasin.toml) and run:
+
+```bash
+mox run deploy --network <network-name> --account <keystore>
+```
+
+## EIP-165 interface identifiers
+
+[`supportsInterface(bytes4)`](https://eips.ethereum.org/EIPS/eip-165) must return **true** for each **interface identifier** (EIP-165 `bytes4` ID) the contract implements. Per [EIP-165](https://eips.ethereum.org/EIPS/eip-165), an interface identifier is the bitwise XOR of the **[function selectors](https://docs.soliditylang.org/en/latest/abi-spec.html#function-selector)** (first four bytes of `keccak256` of the canonical ABI signature) of every function declared in that interface.
+
+The **authoritative** values this contract advertises are the fixed `bytes4` entries in `_SUPPORTED_INTERFACES` in [`src/erc6909.vy`](src/erc6909.vy). They are **not** the output of a single [`cast sig`](https://book.getfoundry.sh/reference/cast/cast-sig) call.
+
+### Verifying selectors (Foundry)
+
+[`cast sig`](https://book.getfoundry.sh/reference/cast/cast-sig) prints each function’s **selector**. To cross-check an interface ID, XOR **all** selectors in that interface; the result must match the corresponding entry in `_SUPPORTED_INTERFACES` (XOR is associative and commutative, so order does not matter).
+
+**IERC6909**
+
+```bash
 cast sig "balanceOf(address,uint256)" &&
 cast sig "allowance(address,address,uint256)" &&
 cast sig "isOperator(address,address)" &&
@@ -56,20 +89,34 @@ cast sig "approve(address,uint256,uint256)" &&
 cast sig "setOperator(address,bool)"
 ```
 
+**IERC6909 ContentURI**
+
 ```bash
-# IERC6909 ContentURI 
 cast sig "contractURI()" &&
 cast sig "tokenURI(uint256)"
 ```
 
+**IERC6909 Metadata**
+
 ```bash
-# IERC6909 Metadata 
 cast sig "name(uint256)" &&
 cast sig "symbol(uint256)" &&
 cast sig "decimals(uint256)"
 ```
 
+**IERC6909 TokenSupply**
+
 ```bash
-# IERC6909 Token Supply 
 cast sig "totalSupply(uint256)"
 ```
+
+## Reference
+
+- [EIP-6909: Multi-Token](https://eips.ethereum.org/EIPS/eip-6909)
+- [EIP-165: Standard Interface Detection](https://eips.ethereum.org/EIPS/eip-165)
+- [Moccasin documentation](https://cyfrin.github.io/moccasin)
+- [OpenZeppelin ERC-1155](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC1155/ERC1155.sol) (design inspiration noted in contract NatSpec)
+
+---
+
+*This is an unaudited reference implementation for educational and development purposes. It is not production-ready software. Use at your own risk. The authors accept no liability for losses or damages arising from its use or deployment. Contract headers license the code under GNU Affero General Public License v3.0 only.*

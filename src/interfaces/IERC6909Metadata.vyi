@@ -2,7 +2,7 @@
 """
 @title EIP-6909 Optional Metadata Interface Definition
 @custom:contract-name IERC6909Metadata
-@license GNU Affero General Public License v3.0 only
+@license MIT
 @author rafael-abuawad
 @notice The metadata extension is optional for an ERC-6909
         smart contract. It exposes a human-readable name,
@@ -25,7 +25,6 @@
 # @dev We import and implement the `IERC165` interface,
 # which is a built-in interface of the Vyper compiler.
 from ethereum.ercs import IERC165
-
 implements: IERC165
 
 

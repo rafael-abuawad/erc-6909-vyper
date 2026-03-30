@@ -11,6 +11,9 @@
         In addition, the following functions have
         been added for convenience:
         - `set_token_uri` (`external` function),
+        - `set_name` (`external` function),
+        - `set_symbol` (`external` function),
+        - `set_decimals` (`external` function),
         - `exists` (`external` `view` function),
         - `burn` (`external` function),
         - `is_minter` (`external` `view` function),
@@ -155,6 +158,24 @@ _CONTRACT_URI: immutable(String[512])
 event RoleMinterChanged:
     minter: indexed(address)
     status: bool
+
+
+# @dev The name of the token of type `id` was updated to `newName`.
+event ERC6909NameUpdated:
+    id: indexed(uint256)
+    newName: String[25]
+
+
+# @dev The symbol for the token of type `id` was updated to `newSymbol`.
+event ERC6909SymbolUpdated:
+    id: indexed(uint256)
+    newSymbol: String[5]
+
+
+# @dev The decimals value for token of type `id` was updated to `newDecimals`.
+event ERC6909DecimalsUpdated:
+    id: indexed(uint256)
+    newDecimals: uint8
 
 
 @deploy
@@ -357,6 +378,42 @@ def renounce_ownership():
     self.is_minter[msg.sender] = False
     log RoleMinterChanged(minter=msg.sender, status=False)
     ownable._transfer_ownership(empty(address))
+
+
+@external
+def set_name(id: uint256, new_name: String[25]):
+    """
+    @dev Sets the human-readable name for token `id`.
+    @param id The 32-byte token id.
+    @param new_name The maximum 25-character name of the token.
+    """
+    assert self.is_minter[msg.sender], "erc6909: access is denied"
+    self._token_metadata[id].name = new_name
+    log ERC6909NameUpdated(id=id, newName=new_name)
+
+
+@external
+def set_symbol(id: uint256, new_symbol: String[5]):
+    """
+    @dev Sets the ticker symbol for token `id`.
+    @param id The 32-byte token id.
+    @param new_symbol The maximum 5-character symbol of the token.
+    """
+    assert self.is_minter[msg.sender], "erc6909: access is denied"
+    self._token_metadata[id].symbol = new_symbol
+    log ERC6909SymbolUpdated(id=id, newSymbol=new_symbol)
+
+
+@external
+def set_decimals(id: uint256, new_decimals: uint8):
+    """
+    @dev Sets the number of decimal places used for amounts of token `id`.
+    @param id The 32-byte token id.
+    @param new_decimals The number of decimal places used for amounts of token `id`.
+    """
+    assert self.is_minter[msg.sender], "erc6909: access is denied"
+    self._token_metadata[id].decimals = new_decimals
+    log ERC6909DecimalsUpdated(id=id, newDecimals=new_decimals)
 
 
 @external

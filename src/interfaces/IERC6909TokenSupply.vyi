@@ -24,7 +24,6 @@
 # @dev We import and implement the `IERC165` interface,
 # which is a built-in interface of the Vyper compiler.
 from ethereum.ercs import IERC165
-
 implements: IERC165
 
 
