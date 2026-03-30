@@ -8,7 +8,6 @@
 """
 
 
-
 # @dev We import and implement the `IERC20Permit`
 # interface, which is written using standard Vyper
 # syntax.
@@ -47,8 +46,8 @@ exports: erc6909.__interface__
 @deploy
 @payable
 def __init__(
-base_uri_: String[80],
-contract_uri_: String[512],
+    base_uri_: String[80],
+    contract_uri_: String[512],
 ):
     """
     @dev To omit the opcodes for checking the `msg.value`
@@ -66,5 +65,3 @@ contract_uri_: String[512],
     # to the `msg.sender`.
     ow.__init__()
     erc6909.__init__(base_uri_, contract_uri_)
-
-

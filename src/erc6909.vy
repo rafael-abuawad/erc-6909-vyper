@@ -105,7 +105,7 @@ struct TokenMetadata:
     decimals: uint8
 
 
-# @dev Stores per-address balances: amount of token type
+# @dev Stores per-address balances: amount of token 
 # `id` owned by each address.
 # @notice If you declare a variable as `public`,
 # Vyper automatically generates an `external`
@@ -113,21 +113,20 @@ struct TokenMetadata:
 _balances: HashMap[address, HashMap[uint256, uint256]]
 
 
-# @dev Allowance for (`owner`, `spender`) on token type `id`
-# (EIP-6909 per-token-type allowance).
+# @dev Allowance for (`owner`, `spender`) on token `id`
 _allowances: HashMap[address, HashMap[address, HashMap[uint256, uint256]]]
 
 
 # @dev `True` if `operator` is approved to move any amount of
-# any token type on behalf of `owner`.
+# any token `id` on behalf of `owner`.
 _operator_approvals: HashMap[address, HashMap[address, bool]]
 
 
-# @dev Total minted supply per token type `id` (token supply extension).
+# @dev Total minted supply per token `id` (token supply extension).
 _total_supply: HashMap[uint256, uint256]
 
 
-# @dev Mapping from token type `id` to metadata
+# @dev Mapping from token `id` to metadata
 _token_metadata: HashMap[uint256, TokenMetadata]
 
 
@@ -136,7 +135,7 @@ _token_metadata: HashMap[uint256, TokenMetadata]
 is_minter: public(HashMap[address, bool])
 
 
-# @dev Mapping from token ID to token URI.
+# @dev Mapping from token id to token URI.
 # @notice Since the Vyper design requires
 # strings of fixed size, we arbitrarily set
 # the maximum length for `_token_uris` to 432
@@ -184,12 +183,12 @@ def __init__(base_uri_: String[80], contract_uri_: String[512]):
 @external
 def transfer(to: address, id: uint256, amount: uint256) -> bool:
     """
-    @dev Transfers `amount` tokens of token type `id` from the caller's
+    @dev Transfers `amount` tokens of token `id` from the caller's
          account to `to`.
     @notice `to` cannot be the zero address. The caller must have a balance
-            of token type `id` of at least `amount`.
+            of token `id` of at least `amount`.
     @param to The 20-byte receiver address.
-    @param id The 32-byte identifier of the token type.
+    @param id The 32-byte token id.
     @param amount The 32-byte token amount to be transferred.
     """
     self._transfer(msg.sender, to, id, amount, msg.sender)
@@ -199,18 +198,18 @@ def transfer(to: address, id: uint256, amount: uint256) -> bool:
 @external
 def transferFrom(owner: address, to: address, id: uint256, amount: uint256):
     """
-    @dev Transfers `amount` tokens of token type `id` from `owner` to `to`.
+    @dev Transfers `amount` tokens of token `id` from `owner` to `to`.
     @notice `owner` and `to` cannot be the zero address. `owner` must have
             a balance of at least `amount`. The caller must be `owner`, an
             operator for `owner` (`isOperator`), or have an allowance of at
-            least `amount` for token type `id`. Allowance is not decreased
+            least `amount` for token `id`. Allowance is not decreased
             when the caller is `owner` or an operator. When allowance is
             used and is not `max_value(uint256)`, it is decreased by `amount`.
 
             WARNING: Infinite allowance (`max_value(uint256)`) is not decreased.
     @param owner The 20-byte address debited by the transfer.
     @param to The 20-byte receiver address.
-    @param id The 32-byte identifier of the token type.
+    @param id The 32-byte token id.
     @param amount The 32-byte token amount to be transferred.
     """
     if msg.sender != owner:
@@ -222,11 +221,11 @@ def transferFrom(owner: address, to: address, id: uint256, amount: uint256):
 @external
 def approve(spender: address, id: uint256, amount: uint256):
     """
-    @dev Sets the allowance of `spender` for token type `id` of the caller
+    @dev Sets the allowance of `spender` for token `id` of the caller
          to `amount` and emits `Approval`.
     @notice `spender` cannot be the zero address.
     @param spender The 20-byte spender address.
-    @param id The 32-byte identifier of the token type.
+    @param id The 32-byte token id.
     @param amount The 32-byte token amount `spender` may transfer on behalf
            of the caller.
     """
@@ -238,10 +237,10 @@ def approve(spender: address, id: uint256, amount: uint256):
 def set_token_uri(id: uint256, token_uri: String[432]):
     """
     @dev Sets the Uniform Resource Identifier (URI)
-         for token type `id`.
-    @notice Decoupled from minting: the same token type `id` can receive
-            more supply later. Only addresses with `is_minter` may set URIs.
-    @param id The 32-byte identifier of the token type.
+         for token `id`.
+    @notice Decoupled from minting: further supply may be minted for the same
+            token id `id` later. Only addresses with `is_minter` may set URIs.
+    @param id The 32-byte token id.
     @param token_uri The maximum 432-character user-readable
            string URI segment combined with `_BASE_URI` in `tokenURI`.
     """
@@ -252,9 +251,9 @@ def set_token_uri(id: uint256, token_uri: String[432]):
 @external
 def burn(id: uint256, amount: uint256):
     """
-    @dev Destroys `amount` tokens of token type `id` from the caller.
-    @notice `amount` cannot exceed the balance of token type `id` of the caller.
-    @param id The 32-byte identifier of the token type.
+    @dev Destroys `amount` tokens of token `id` from the caller.
+    @notice `amount` cannot exceed the balance of token `id` of the caller.
+    @param id The 32-byte token id.
     @param amount The 32-byte token amount to be burned.
     """
     self._burn(msg.sender, id, amount)
@@ -270,7 +269,7 @@ def burn_from(owner: address, id: uint256, amount: uint256):
             have an allowance for `owner`'s tokens
             of at least `amount`.
     @param owner The 20-byte owner address.
-    @param id The 32-byte identifier of the token type.
+    @param id The 32-byte token id.
     @param amount The 32-byte token amount to be destroyed.
     """
     self._spend_allowance(owner, msg.sender, id, amount)
@@ -280,11 +279,11 @@ def burn_from(owner: address, id: uint256, amount: uint256):
 @external
 def mint(owner: address, id: uint256, amount: uint256):
     """
-    @dev Creates `amount` tokens and assigns them to `owner`.
+    @dev Creates `amount` tokens of token `id` and assigns them to `owner`.
     @notice Only authorised minters can access this function.
             Note that `owner` cannot be the zero address.
     @param owner The 20-byte owner address.
-    @param id The 32-byte identifier of the token type.
+    @param id The 32-byte token id.
     @param amount The 32-byte token amount to be created.
     """
     assert self.is_minter[msg.sender], "erc6909: access is denied"
@@ -377,10 +376,10 @@ def supportsInterface(interface_id: bytes4) -> bool:
 @view
 def name(id: uint256) -> String[25]:
     """
-    @dev Returns the human-readable name for token type `id`.
-    @param id The 32-byte identifier of the token type.
+    @dev Returns the human-readable name for token `id`.
+    @param id The 32-byte token id.
     @return String The maximum 25-character name of the token
-            type `id`.
+            id `id`.
     """
     return self._token_metadata[id].name
 
@@ -389,10 +388,10 @@ def name(id: uint256) -> String[25]:
 @view
 def symbol(id: uint256) -> String[5]:
     """
-    @dev Returns the ticker symbol for token type `id`.
-    @param id The 32-byte identifier of the token type.
+    @dev Returns the ticker symbol for token `id`.
+    @param id The 32-byte token id.
     @return String The maximum 5-character symbol of the token
-            type `id`.
+            id `id`.
     """
     return self._token_metadata[id].symbol
 
@@ -402,9 +401,9 @@ def symbol(id: uint256) -> String[5]:
 def decimals(id: uint256) -> uint8:
     """
     @dev Returns the number of decimal places used for amounts
-         of token type `id`.
-    @param id The 32-byte identifier of the token type.
-    @return uint8 The decimals value for token type `id`.
+         of token `id`.
+    @param id The 32-byte token id.
+    @return uint8 The decimals value for token id `id`.
     """
     return self._token_metadata[id].decimals
 
@@ -413,10 +412,10 @@ def decimals(id: uint256) -> uint8:
 @view
 def balanceOf(owner: address, id: uint256) -> uint256:
     """
-    @dev Returns the amount of tokens of token type
-         `id` owned by `owner`.
+    @dev Returns the amount of tokens of token
+         id `id` owned by `owner`.
     @param owner The 20-byte owner address.
-    @param id The 32-byte identifier of the token.
+    @param id The 32-byte token id.
     @return uint256 The 32-byte token amount owned
             by `owner`.
     """
@@ -427,12 +426,12 @@ def balanceOf(owner: address, id: uint256) -> uint256:
 @view
 def allowance(owner: address, spender: address, id: uint256) -> uint256:
     """
-    @dev Returns the amount of tokens of token type
-         `id` that `spender` is allowed to spend on
+    @dev Returns the amount of tokens of token
+         id `id` that `spender` is allowed to spend on
          behalf of `owner`.
     @param owner The 20-byte owner address.
     @param spender The 20-byte spender address.
-    @param id The 32-byte identifier of the token.
+    @param id The 32-byte token id.
     @return uint256 The 32-byte token amount that `spender`
             is allowed to spend on behalf of `owner`.
     """
@@ -444,7 +443,7 @@ def allowance(owner: address, spender: address, id: uint256) -> uint256:
 def isOperator(owner: address, operator: address) -> bool:
     """
     @dev Returns `True` if `operator` is approved to transfer
-         any amount of any token type on behalf of `owner`.
+         any amount of any token id on behalf of `owner`.
     @param owner The 20-byte owner address.
     @param operator The 20-byte operator address.
     @return bool The verification whether `operator` is approved
@@ -488,16 +487,16 @@ def contractURI() -> String[512]:
 def tokenURI(id: uint256) -> String[512]:
     """
     @dev Returns the Uniform Resource Identifier (URI)
-         for token type `id`.
+         for token `id`.
     @notice If the `{id}` substring is present in the URI,
             it must be replaced by clients with the actual
-            token type ID. Note that the `tokenURI` function must
+            token id. Note that the `tokenURI` function must
             not be used to check for the existence of a token
             as it is possible for the implementation to return
             a valid string even if the token does not exist.
-    @param id The 32-byte identifier of the token type `id`.
+    @param id The 32-byte token id.
     @return String The maximum 512-character user-readable
-            string token URI of the token type `id`.
+            string token URI for token id `id`.
     """
     return self._token_uri(id)
 
@@ -506,10 +505,10 @@ def tokenURI(id: uint256) -> String[512]:
 @view
 def exists(id: uint256) -> bool:
     """
-    @dev Returns whether token type `id` exists: `True` if total supply
+    @dev Returns whether token id `id` exists: `True` if total supply
          for `id` is non-zero (`totalSupply(id) != 0`).
-    @param id The 32-byte identifier of the token type.
-    @return bool Whether any amount of token type `id` has been minted.
+    @param id The 32-byte token id.
+    @return bool Whether any amount of token id `id` has been minted.
     """
     return self._total_supply[id] != empty(uint256)
 
@@ -518,26 +517,21 @@ def exists(id: uint256) -> bool:
 @view
 def totalSupply(id: uint256) -> uint256:
     """
-    @dev Returns the total supply of token type `id` (token supply extension).
-    @param id The 32-byte identifier of the token type.
+    @dev Returns the total supply of token id `id` (token supply extension).
+    @param id The 32-byte token id.
     @return uint256 The cumulative minted amount for `id`.
     """
     return self._total_supply[id]
 
 
-#*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*#
-#*                     INTERNAL FUNCTIONS                     *#
-#*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*#
-
-
 @internal
 def _before_token_transfer(owner: address, to: address, id: uint256, amount: uint256):
     """
-    @dev Hook called before any transfer of token type `id`; no-op here.
+    @dev Hook called before any transfer of token id `id`; no-op here.
          Override via inheritance patterns if extending this contract.
     @param owner The 20-byte address debited by the transfer.
     @param to The 20-byte receiver address.
-    @param id The 32-byte identifier of the token type.
+    @param id The 32-byte token id.
     @param amount The 32-byte token amount moved.
     """
     pass
@@ -546,10 +540,10 @@ def _before_token_transfer(owner: address, to: address, id: uint256, amount: uin
 @internal
 def _after_token_transfer(owner: address, to: address, id: uint256, amount: uint256):
     """
-    @dev Hook called after any transfer of token type `id`; no-op here.
+    @dev Hook called after any transfer of token id `id`; no-op here.
     @param owner The 20-byte address debited by the transfer.
     @param to The 20-byte receiver address.
-    @param id The 32-byte identifier of the token type.
+    @param id The 32-byte token id.
     @param amount The 32-byte token amount moved.
     """
     pass
@@ -565,7 +559,7 @@ def _mint(owner: address, id: uint256, amount: uint256):
             access restriction. Note that `owner`
             cannot be the zero address.
     @param owner The 20-byte owner address.
-    @param id The 32-byte identifier of the token type.
+    @param id The 32-byte token id.
     @param amount The 32-byte token amount to be created.
     """
     assert owner != empty(address), "erc20: mint to the zero address"
@@ -583,13 +577,13 @@ def _mint(owner: address, id: uint256, amount: uint256):
 @internal
 def _burn(owner: address, id: uint256, amount: uint256):
     """
-    @dev Destroys `amount` tokens from `owner`,
+    @dev Destroys `amount` tokens of token `id` from `owner`,
          reducing the total supply.
     @notice Note that `owner` cannot be the
             zero address. Also, `owner` must
             have at least `amount` tokens.
     @param owner The 20-byte owner address.
-    @param id The 32-byte identifier of the token type.
+    @param id The 32-byte token id.
     @param amount The 32-byte token amount to be destroyed.
     """
     assert owner != empty(address), "erc20: burn from the zero address"
@@ -608,14 +602,14 @@ def _burn(owner: address, id: uint256, amount: uint256):
 @internal
 def _approve(owner: address, spender: address, id: uint256, amount: uint256):
     """
-    @dev Sets the allowance of `spender` for token type `id` of `owner`
+    @dev Sets the allowance of `spender` for token `id` of `owner`
          to `amount` and emits `IERC6909.Approval`.
     @notice `owner` and `spender` cannot be the zero address.
     @param owner The 20-byte owner address.
     @param spender The 20-byte spender address.
-    @param id The 32-byte identifier of the token type.
+    @param id The 32-byte token id.
     @param amount The 32-byte token amount `spender` may transfer on
-           behalf of `owner` for this token type.
+           behalf of `owner` for this token `id`.
     """
     assert owner != empty(address), "erc6909: approve from the zero address"
     assert spender != empty(address), "erc6909: approve to the zero address"
@@ -629,14 +623,14 @@ def _transfer(
     owner: address, to: address, id: uint256, amount: uint256, caller: address
 ):
     """
-    @dev Moves `amount` of token type `id` from `owner` to `to`.
+    @dev Moves `amount` of token `id` from `owner` to `to`.
     @notice Runs `_before_token_transfer` then `_after_token_transfer`.
             Emits `IERC6909.Transfer` with `_caller`, `_from`, `_to`,
             `_id`, and `_value` per the interface. `owner` and `to`
             cannot be zero; `owner` must have sufficient balance.
     @param owner The 20-byte address debited by the transfer.
     @param to The 20-byte receiver address.
-    @param id The 32-byte identifier of the token type.
+    @param id The 32-byte token id.
     @param amount The 32-byte token amount to be transferred.
     @param caller The 20-byte address that initiated the transfer
            (`msg.sender` for external entrypoints).
@@ -660,7 +654,7 @@ def _transfer(
 @internal
 def _spend_allowance(owner: address, spender: address, id: uint256, amount: uint256):
     """
-    @dev Decreases `spender`'s allowance on token type `id` for `owner`
+    @dev Decreases `spender`'s allowance on token `id` for `owner`
          by `amount` when the stored allowance is less than `max_value(uint256)`.
     @notice Does not decrease allowance when it equals `max_value(uint256)`.
             Reverts if the current allowance is below `amount` (except on
@@ -668,7 +662,7 @@ def _spend_allowance(owner: address, spender: address, id: uint256, amount: uint
             not the remaining allowance.
     @param owner The 20-byte owner address.
     @param spender The 20-byte spender address.
-    @param id The 32-byte identifier of the token type.
+    @param id The 32-byte token id.
     @param amount The 32-byte token amount to consume from the allowance.
     """
     current_allowance: uint256 = self._allowances[owner][spender][id]
@@ -688,12 +682,12 @@ def _spend_allowance(owner: address, spender: address, id: uint256, amount: uint
 def _set_token_uri(id: uint256, token_uri: String[432]):
     """
     @dev Sets the Uniform Resource Identifier (URI)
-         for token type `id`.
+         for token `id`.
     @notice This is an `internal` function without access
             restriction. This function is decoupled from
             `_mint`, as multiple of the same `id` can be
             minted.
-    @param id The 32-byte identifier of the token.
+    @param id The 32-byte token id.
     @param token_uri The maximum 432-character user-readable
            string URI segment for `tokenURI`.
     """
@@ -705,15 +699,15 @@ def _set_token_uri(id: uint256, token_uri: String[432]):
 def _token_uri(id: uint256) -> String[512]:
     """
     @dev An `internal` helper function that returns the Uniform
-         Resource Identifier (URI) for token type `id`.
+         Resource Identifier (URI) for token `id`.
     @notice If the `{id}` substring is present in the URI,
             it must be replaced by clients with the actual
-            token type ID. Do not use `tokenURI` to infer
+            token `id`. Do not use `tokenURI` to infer
             token existence; a non-empty URI does not imply
             a positive balance or supply.
-    @param id The 32-byte identifier of the token type `id`.
+    @param id The 32-byte token id.
     @return String The maximum 512-character user-readable
-            string token URI of the token type `id`.
+            string token URI for token id `id`.
     """
     token_uri: String[432] = self._token_uris[id]
 
@@ -726,7 +720,7 @@ def _token_uri(id: uint256) -> String[512]:
     elif len(token_uri) != empty(uint256):
         return concat(_BASE_URI, token_uri)
     # If there is no token URI but a base URI,
-    # concatenate the base URI and token ID.
+    # concatenate the base URI and token id.
     elif base_uri_length != empty(uint256):
         # Please note that for projects where the
         # substring `{id}` is present in the URI

@@ -6,8 +6,8 @@
 @author rafael-abuawad
 @notice The metadata extension is optional for an ERC-6909
         smart contract. It exposes a human-readable name,
-        ticker symbol, and decimals count for each token type
-        `id`. For more details, please refer to:
+        ticker symbol, and decimals count for each token
+        id `id`. For more details, please refer to:
         https://eips.ethereum.org/EIPS/eip-6909#metadata-extension.
 
         Note that Vyper interfaces that implement functions
@@ -25,6 +25,7 @@
 # @dev We import and implement the `IERC165` interface,
 # which is a built-in interface of the Vyper compiler.
 from ethereum.ercs import IERC165
+
 implements: IERC165
 
 
@@ -60,10 +61,10 @@ def supportsInterface(interfaceId: bytes4) -> bool:
 @view
 def name(_id: uint256) -> String[25]:
     """
-    @dev Returns the human-readable name for token type `_id`.
-    @param _id The 32-byte identifier of the token type.
+    @dev Returns the human-readable name for token `_id`.
+    @param _id The 32-byte token id.
     @return String The maximum 25-character name of the token
-            type `_id`.
+            id `_id`.
     """
     ...
 
@@ -72,10 +73,10 @@ def name(_id: uint256) -> String[25]:
 @view
 def symbol(_id: uint256) -> String[5]:
     """
-    @dev Returns the ticker symbol for token type `_id`.
-    @param _id The 32-byte identifier of the token type.
+    @dev Returns the ticker symbol for token `_id`.
+    @param _id The 32-byte token id.
     @return String The maximum 5-character symbol of the token
-            type `_id`.
+            id `_id`.
     """
     ...
 
@@ -85,8 +86,8 @@ def symbol(_id: uint256) -> String[5]:
 def decimals(_id: uint256) -> uint8:
     """
     @dev Returns the number of decimal places used for amounts
-         of token type `_id`.
-    @param _id The 32-byte identifier of the token type.
-    @return uint8 The decimals value for token type `_id`.
+         of token `_id`.
+    @param _id The 32-byte token id.
+    @return uint8 The decimals value for token id `_id`.
     """
     ...
