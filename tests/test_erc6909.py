@@ -302,7 +302,7 @@ def test_set_minter_owner_address_reverts(erc6909_contract, owner):
 def test_mint_to_zero_address_reverts(erc6909_contract, owner):
     with boa.env.prank(owner):
         tid = erc6909_contract.create("Z", "Z", 18)
-        with boa.reverts("erc20: mint to the zero address"):
+        with boa.reverts("erc6909: mint to the zero address"):
             erc6909_contract.mint(boa.eval("empty(address)"), tid, 1)
 
 

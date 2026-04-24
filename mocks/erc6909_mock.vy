@@ -8,10 +8,10 @@
 """
 
 
-# @dev We import and implement the `IERC20Permit`
+# @dev We import and implement the `IERC6909`
 # interface, which is written using standard Vyper
 # syntax.
-from ..interfaces import IERC6909
+from ..src.interfaces import IERC6909
 implements: IERC6909
 
 
@@ -20,15 +20,15 @@ from snekmate.auth import ownable as ow
 initializes: ow
 
 
-# @dev We import and initialise the `erc20` module.
-from .. import erc6909
+# @dev We import and initialise the `erc6909` module.
+from ..src import erc6909
 initializes: erc6909[ownable := ow]
 
 
 # @dev We export (i.e. the runtime bytecode exposes these
 # functions externally, allowing them to be called using
 # the ABI encoding specification) all `external` functions
-# from the `erc20` module. The built-in dunder method
+# from the `erc6909` module. The built-in dunder method
 # `__interface__` allows you to export all functions of a
 # module without specifying the individual functions (see
 # https://github.com/vyperlang/vyper/pull/3919). Please take

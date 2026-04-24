@@ -1,4 +1,4 @@
-from src.mocks import erc6909_mock as ERC6909
+from mocks import erc6909_mock as ERC6909
 from moccasin.boa_tools import VyperContract
 
 base_uri = "https://example.com"

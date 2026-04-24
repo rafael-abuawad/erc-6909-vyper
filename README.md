@@ -20,7 +20,7 @@ Gas-efficient, extended Vyper module for the [EIP-6909](https://eips.ethereum.or
 | [`src/interfaces/IERC6909ContentURI.vyi`](src/interfaces/IERC6909ContentURI.vyi) | Content URI extension |
 | [`src/interfaces/IERC6909Metadata.vyi`](src/interfaces/IERC6909Metadata.vyi) | Metadata extension |
 | [`src/interfaces/IERC6909TokenSupply.vyi`](src/interfaces/IERC6909TokenSupply.vyi) | Token supply extension |
-| [`src/mocks/erc6909_mock.vy`](src/mocks/erc6909_mock.vy) | Mock that initialises the module (used by tests and [`script/deploy.py`](script/deploy.py)) |
+| [`mocks/erc6909_mock.vy`](mocks/erc6909_mock.vy) | Mock that initialises the module (used by tests and [`script/deploy.py`](script/deploy.py)) |
 | [`moccasin.toml`](moccasin.toml) | Moccasin project config (e.g. snekmate dependency, networks) |
 
 **Standards:** [EIP-165](https://eips.ethereum.org/EIPS/eip-165) via built-in `IERC165`; EIP-6909 and the optional extensions above. Declared interface IDs are listed in `_SUPPORTED_INTERFACES` in [`src/erc6909.vy`](src/erc6909.vy).
@@ -38,8 +38,6 @@ Gas-efficient, extended Vyper module for the [EIP-6909](https://eips.ethereum.or
 pip install moccasin
 mox install
 ```
-
-
 
 ## Build
 

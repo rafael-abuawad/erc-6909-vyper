@@ -448,7 +448,7 @@ def _mint(owner: address, id: uint256, amount: uint256):
     @dev Increases `_total_supply` and `_balances`; emits mint-shaped `Transfer` (`_from` zero).
     @notice zero address checks on `owner` reverts. `_caller` in the event is zero (internal path).
     """
-    assert owner != empty(address), "erc20: mint to the zero address"
+    assert owner != empty(address), "erc6909: mint to the zero address"
 
     self._before_token_transfer(empty(address), owner, id, amount)
 
@@ -471,7 +471,7 @@ def _burn(owner: address, id: uint256, amount: uint256):
     @dev Decreases balance and supply; emits burn-shaped `Transfer` (`_to` zero).
     @notice zero address checks on `owner` reverts; `amount` must not exceed balance.
     """
-    assert owner != empty(address), "erc20: burn from the zero address"
+    assert owner != empty(address), "erc6909: burn from the zero address"
 
     self._before_token_transfer(owner, empty(address), id, amount)
 
